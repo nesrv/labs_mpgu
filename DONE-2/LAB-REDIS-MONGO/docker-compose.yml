@@ -1,0 +1,24 @@
+services:
+  db:
+    image: postgres:17
+    env_file:
+      - .env
+    ports:
+      - "5432:5432"
+
+  mongodb:
+    image: mongo:7
+    env_file:
+      - .env
+    ports:
+      - "27017:27017"
+
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+      - mongodb
+    env_file:
+      - .env
