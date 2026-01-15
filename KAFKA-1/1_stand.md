@@ -232,38 +232,17 @@ docker exec -it kafka /opt/kafka/bin/kafka-topics.sh --list --bootstrap-server l
 
 ```python
 from kafka import KafkaProducer
-from kafka.errors import KafkaError
-import time
 
-try:
-    producer = KafkaProducer(
-        bootstrap_servers='localhost:19092',
-        value_serializer=lambda v: v.encode('utf-8')
-    )
+producer = KafkaProducer(
+    bootstrap_servers='localhost:19092',
+    value_serializer=lambda v: v.encode('utf-8')
+)
 
-    print("Producer подключён к Kafka")
-    print("Отправка сообщений...")
+for i in range(1, 6):
+    producer.send('hello-kafka', f'Hello Kafka {i}')
+    print(f'Sent: Hello Kafka {i}')
 
-    for i in range(1, 6):
-        message = f"Hello Kafka {i}"
-        future = producer.send('hello-kafka', message)
-
-        # Ждём подтверждения отправки
-        try:
-            record_metadata = future.get(timeout=10)
-            print(f"✓ Отправлено: {message} (partition: {record_metadata.partition}, offset: {record_metadata.offset})")
-        except KafkaError as e:
-            print(f"✗ Ошибка при отправке: {e}")
-
-        time.sleep(1)
-
-    producer.flush()
-    producer.close()
-    print("\nВсе сообщения отправлены успешно!")
-
-except Exception as e:
-    print(f"Ошибка подключения к Kafka: {e}")
-    print("Убедитесь, что Kafka запущен: docker-compose ps")
+producer.close()
 ```
 
 ---
@@ -274,44 +253,20 @@ except Exception as e:
 
 ```python
 from kafka import KafkaConsumer
-from kafka.errors import KafkaError
-import sys
 
-try:
-    consumer = KafkaConsumer(
-        'hello-kafka',
-        bootstrap_servers='localhost:19092',
-        group_id='hello-group',
-        auto_offset_reset='earliest',  # Читать с начала, если offset не сохранён
-        value_deserializer=lambda v: v.decode('utf-8')
-        # НЕ устанавливаем consumer_timeout_ms - consumer будет ждать бесконечно
-    )
+consumer = KafkaConsumer(
+    'hello-kafka',
+    bootstrap_servers='localhost:19092',
+    group_id='hello-group',
+    auto_offset_reset='earliest',
+    value_deserializer=lambda v: v.decode('utf-8')
+)
 
-    print("Consumer подключён к Kafka")
-    print("Ожидание сообщений...")
-    print("(Нажмите Ctrl+C для остановки)")
-    print("\n💡 Подсказка: Запустите producer.py в другом терминале, чтобы отправить сообщения\n")
-
-    message_count = 0
-    for msg in consumer:
-        message_count += 1
-        print(f"✓ Получено [{message_count}]: {msg.value}")
-        print(f"  Partition: {msg.partition}, Offset: {msg.offset}, Timestamp: {msg.timestamp}")
-
-except KeyboardInterrupt:
-    print("\n\nConsumer остановлен пользователем")
-    consumer.close()
-except KafkaError as e:
-    print(f"Ошибка Kafka: {e}")
-    sys.exit(1)
-except Exception as e:
-    print(f"Ошибка подключения к Kafka: {e}")
-    print("Убедитесь, что Kafka запущен: docker-compose ps")
-    sys.exit(1)
-finally:
-    if 'consumer' in locals():
-        consumer.close()
+for msg in consumer:
+    print(f'Received: {msg.value}')
 ```
+
+> **Примечание:** Для остановки consumer нажмите **Ctrl+C**.
 
 ---
 
@@ -327,17 +282,7 @@ finally:
 python consumer.py
 ```
 
-Consumer начнёт ждать сообщения. Вы увидите:
-
-```
-Consumer подключён к Kafka
-Ожидание сообщений...
-(Нажмите Ctrl+C для остановки)
-
-💡 Подсказка: Запустите producer.py в другом терминале, чтобы отправить сообщения
-```
-
-> **Важно:** Consumer будет ждать **бесконечно**, пока не появятся сообщения. Не закрывайте этот терминал!
+Consumer начнёт ждать сообщения.
 
 **Терминал 2 — producer (запустите во втором терминале):**
 
@@ -345,14 +290,24 @@ Consumer подключён к Kafka
 python producer.py
 ```
 
-Producer отправит 5 сообщений, и consumer **сразу их получит** в первом терминале:
+Producer отправит 5 сообщений:
 
 ```
-✓ Получено [1]: Hello Kafka 1
-  Partition: 0, Offset: 0, Timestamp: 1737049200000
-✓ Получено [2]: Hello Kafka 2
-  Partition: 0, Offset: 1, Timestamp: 1737049201000
-...
+Sent: Hello Kafka 1
+Sent: Hello Kafka 2
+Sent: Hello Kafka 3
+Sent: Hello Kafka 4
+Sent: Hello Kafka 5
+```
+
+Consumer получит их в первом терминале:
+
+```
+Received: Hello Kafka 1
+Received: Hello Kafka 2
+Received: Hello Kafka 3
+Received: Hello Kafka 4
+Received: Hello Kafka 5
 ```
 
 ### Вариант 2: Producer запускается первым
@@ -538,11 +493,11 @@ Consumer group появляется в Kafka UI **только после тог
 Consumer выводит:
 
 ```
-Получено: Hello Kafka 1
-Получено: Hello Kafka 2
-Получено: Hello Kafka 3
-Получено: Hello Kafka 4
-Получено: Hello Kafka 5
+Received: Hello Kafka 1
+Received: Hello Kafka 2
+Received: Hello Kafka 3
+Received: Hello Kafka 4
+Received: Hello Kafka 5
 ```
 
 ---
@@ -556,18 +511,6 @@ Consumer выводит:
 5. Что произойдёт, если consumer запустить повторно?
 
 ---
-
-## 📝 Отчёт по лабораторной работе
-
-Отчёт должен содержать:
-
-1. Цель работы
-2. Версию Kafka (**4.1.1, KRaft**)
-3. Docker Compose файл
-4. Код producer и consumer
-5. Скриншоты работы
-6. Ответы на контрольные вопросы
-7. Выводы
 
 ---
 
@@ -584,13 +527,4 @@ Consumer выводит:
 
 В ходе лабораторной работы был изучен принцип работы Apache Kafka 4.1.1 в режиме KRaft и реализован простой обмен сообщениями между producer и consumer на языке Python.
 
----
 
-Если хочешь, дальше могу:
-
-- сделать **ЛР №2 (логи, JSON, ключи)**
-- оформить **методичку в Word**
-- подготовить **задания + критерии оценки**
-- показать **Kafka UI (Redpanda Console / AKHQ)**
-
-Скажи, что нужно дальше 🚀
